@@ -20,6 +20,9 @@ nowEast = 2017-06-22T16:15:21+08:00
 nowWest = 2017-06-22T02:14:36-06:00
 yesOrNo = true
 pi = 3.14
+hexNumber = 0x12345678
+octNumber = 0o1234567
+binNumber = 0b10101010
 colors = [
 	["red", "green", "blue"],
 	["cyan", "magenta", "yellow", "black"],
@@ -35,16 +38,19 @@ cauchy = "cat 2"
 		Cauchy string
 	}
 	type simple struct {
-		Age     int
-		Colors  [][]string
-		Pi      float64
-		YesOrNo bool
-		Now     time.Time
-		NowEast time.Time
-		NowWest time.Time
-		Andrew  string
-		Kait    string
-		My      map[string]cats
+		Age       int
+		HexNumber int
+		OctNumber int
+		BinNumber int
+		Colors    [][]string
+		Pi        float64
+		YesOrNo   bool
+		Now       time.Time
+		NowEast   time.Time
+		NowWest   time.Time
+		Andrew    string
+		Kait      string
+		My        map[string]cats
 	}
 
 	var val simple
@@ -66,14 +72,17 @@ cauchy = "cat 2"
 		panic(err)
 	}
 	var answer = simple{
-		Age:     250,
-		Andrew:  "gallant",
-		Kait:    "brady",
-		Now:     now,
-		NowEast: nowEast,
-		NowWest: nowWest,
-		YesOrNo: true,
-		Pi:      3.14,
+		Age:       250,
+		HexNumber: 0x12345678,
+		OctNumber: 01234567,
+		BinNumber: 0xaa,
+		Andrew:    "gallant",
+		Kait:      "brady",
+		Now:       now,
+		NowEast:   nowEast,
+		NowWest:   nowWest,
+		YesOrNo:   true,
+		Pi:        3.14,
 		Colors: [][]string{
 			{"red", "green", "blue"},
 			{"cyan", "magenta", "yellow", "black"},
@@ -560,6 +569,76 @@ func TestDecodeFloats(t *testing.T) {
 	}
 }
 
+func TestDecodeHexadecimals(t *testing.T) {
+	for _, tt := range []struct {
+		s    string
+		want int64
+	}{
+		{"0x0", 0},
+		{"0xabcdef", 0xabcdef},
+		{"0xABCDEF", 0xabcdef},
+		{"0xAbCdEf", 0xabcdef},
+		{"0x1_234_567", 0x1234567},
+		{"0x1_2_3_4", 0x1234},
+		{"0x7fffffffffffffff", math.MaxInt64},
+	} {
+		var x struct{ N int64 }
+		input := "n = " + tt.s
+		if _, err := Decode(input, &x); err != nil {
+			t.Errorf("Decode(%q): got error: %s", input, err)
+			continue
+		}
+		if x.N != tt.want {
+			t.Errorf("Decode(%q): got %d; want %d", input, x.N, tt.want)
+		}
+	}
+}
+
+func TestDecodeOctals(t *testing.T) {
+	for _, tt := range []struct {
+		s    string
+		want int64
+	}{
+		{"0o0", 0},
+		{"0o1234567", 01234567},
+		{"0o1_234_567", 01234567},
+		{"0o1_2_3_4", 01234},
+		{"0o777777777777777777777", math.MaxInt64},
+	} {
+		var x struct{ N int64 }
+		input := "n = " + tt.s
+		if _, err := Decode(input, &x); err != nil {
+			t.Errorf("Decode(%q): got error: %s", input, err)
+			continue
+		}
+		if x.N != tt.want {
+			t.Errorf("Decode(%q): got %d; want %d", input, x.N, tt.want)
+		}
+	}
+}
+
+func TestDecodeBinaries(t *testing.T) {
+	for _, tt := range []struct {
+		s    string
+		want int64
+	}{
+		{"0b0", 0},
+		{"0b10101010", 0xaa},
+		{"0b1010_1010", 0xaa},
+		{"0b1_0_1_0_1_0_1_0", 0xaa},
+		{"0b111111111111111111111111111111111111111111111111111111111111111", math.MaxInt64},
+	} {
+		var x struct{ N int64 }
+		input := "n = " + tt.s
+		if _, err := Decode(input, &x); err != nil {
+			t.Errorf("Decode(%q): got error: %s", input, err)
+			continue
+		}
+		if x.N != tt.want {
+			t.Errorf("Decode(%q): got %d; want %d", input, x.N, tt.want)
+		}
+	}
+}
 func TestDecodeMalformedNumbers(t *testing.T) {
 	for _, tt := range []struct {
 		s    string
@@ -576,6 +655,13 @@ func TestDecodeMalformedNumbers(t *testing.T) {
 		{"1e__23", "surrounded by digits"},
 		{"123.", "must be followed by one or more digits"},
 		{"1.e2", "must be followed by one or more digits"},
+		{"0x_1234", "surrounded by digits"},
+		{"0o_1234", "surrounded by digits"},
+		{"0b_1111", "surrounded by digits"},
+		{"0xabcdefghijkl", "expected a top-level item"},
+		{"0o123456789", "expected a top-level item"},
+		{"0b1234", "expected a top-level item"},
+		{"123456789abcdef", "expected a top-level item"},
 	} {
 		var x struct{ N interface{} }
 		input := "n = " + tt.s
